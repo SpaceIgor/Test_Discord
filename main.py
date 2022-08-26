@@ -1,7 +1,6 @@
 import requests
 import random
 import string
-import json
 from typing import List
 from datetime import datetime, timedelta
 
