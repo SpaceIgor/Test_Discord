@@ -5,21 +5,29 @@ from typing import List
 from datetime import datetime, timedelta
 
 
-class Authorization:
+class BadOperationError(Exception):
+    """"This exception is thrown when there is no specified operation"""
+    pass
 
-    def generate_password(self, length: int = 16) -> str:
+
+class Authorization:
+    def getFingerPrint(self):
+        response = requests.get('https://discord.com/api/v9/experiments').json()
+        fingerprint = response['fingerprint']
+        return fingerprint
+
+    def generatePassword(self, length: int = 16) -> str:
         """
          Generate a password of a given `length`.
          """
         result: List[str] = []
-        choices = string.printable  # заглавые и строчные буквы, цифры и знаки препинания
+        choices = string.printable
         while len(result) < length:
-            symbol = random.choice(string.printable)
+            symbol = random.choice(choices)
             result.append(symbol)
         return "".join(result)
 
-
-    def generate_random_date(self):
+    def generateRandomDate(self):
         start_date = datetime(1950, 1, 1)
         end_date = datetime(2000, 1, 1)
         t: timedelta = end_date - start_date
@@ -27,65 +35,39 @@ class Authorization:
         result = start_date + timedelta(days=rand_days)
         return result.strftime("%Y-%m-%d")
 
-
-    def register(self, username: str, email: str, password: str) -> None:
-        date: str = self.generate_random_date()
-        captcha_key: str = input("Please input captcha : ")
+    def register(self, username: str, email: str) -> None:
 
         data: dict = {
-            'captcha_key': captcha_key,
+            'captcha_key': None,
             'consent': True,
-            'date_of_birth': date,
+            'date_of_birth': self.generateRandomDate(),
             'email': email,
-            'fingerprint': 'null',
+            'fingerprint': self.getFingerPrint(),
             'gift_code_sku_id': None,
             'invite': None,
-            'password': password,
+            'password': self.generatePassword(),
+            'promotional_email_opt_in': True,
             'username': username,
         }
 
         headers: dict = {
-            "content-type": "application/json",
-            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.63 Safari/537.36"
+            'referer': 'https://discord.com/register',
+            'authorization': 'undefined'
         }
 
-        response = requests.post('https://discord.com/register', headers=headers, json=data)
-        return response
-
-    def get_token(self, email: str, password: str) -> None:
-        headers: dict = {
-            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36',
-            'Host': 'discord.com',
-            'Accept': '*/*',
-            'Accept-Language': 'en-US',
-            'Content-Type': 'application/json',
-            'Referer': 'https://discord.com/register',
-            'Origin': 'https://discord.com',
-            'DNT': '1',
-            'Connection': 'keep-alive',
-        }
-
-        data: dict = {
-            'email': email,
-            'password': password,
-        }
-        response = requests.post('https://discord.com/api/v6/auth/login',
-                                 headers=headers, json=data)
-        j_data = response.json()
-        print("\nCaptcha finished, grabbing token.\n")
-        try:
-            return print(j_data['token'])
-        except:
-            token = "Could not get token."
-            return print(token)
-
+        response = requests.post('https://discord.com/api/v9/auth/register', headers=headers, json=data)
+        if response.status_code == 201:
+            response = response.json()
+            print(f'Your login: {email}')
+            try:
+                return print(f'Your token: {response["token"]}')
+            except BadOperationError:
+                token = "Could not get token.Try again late"
+                return print(token)
 
 
 if __name__ == "__main__":
     runner = Authorization()
-    password = runner.generate_password()
     username = input('Enter your name: ')
     email = input('Enter your email: ')
-    runner.register(email, username, password)
-    runner.get_token(email, password)
-
+    runner.register(username, email)
